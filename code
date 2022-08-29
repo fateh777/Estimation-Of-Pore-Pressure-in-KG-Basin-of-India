@@ -1,0 +1,228 @@
+import numpy as np 
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+%matplotlib inline
+
+df= pd.read_csv("/content/drive/MyDrive/day.csv")
+
+from google.colab import drive
+drive.mount('/content/drive')
+
+df.head()
+df.shape
+df.dtypes
+
+df.rename(columns={'instant':'rec_id','dteday':'datetime','yr':'year','mnth':'month','weathersit':'weather_condition',
+                       'hum':'humidity','cnt':'total_count'},inplace=True)
+df.head()
+
+df['datetime']=pd.to_datetime(df.datetime)
+df['season']=df.season.astype('category')
+df['year']=df.year.astype('category')
+df['month']=df.month.astype('category')
+df['holiday']=df.holiday.astype('category')
+df['weekday']=df.weekday.astype('category')
+df['workingday']=df.workingday.astype('category')
+df['weather_condition']=df.weather_condition.astype('category')
+
+df.dtypes
+df.describe()
+
+df.isnull().sum()
+
+fig,ax=plt.subplots(figsize=(15,8))
+sns.set_style('white')
+#Bar plot for seasonwise monthly distribution of counts
+sns.barplot(x='month',y='total_count',data=df[['month','total_count','season']],hue='season',ax=ax)
+ax.set_title('Seasonwise monthly distribution of counts')
+plt.show()
+#Bar plot for weekday wise monthly distribution of counts
+fig,ax1=plt.subplots(figsize=(15,8))
+sns.barplot(x='month',y='total_count',data=df[['month','total_count','weekday']],hue='weekday',ax=ax1)
+ax1.set_title('Weekday wise monthly distribution of counts')
+plt.show()
+
+fig,ax=plt.subplots(figsize=(15,8))
+#Violin plot for yearly distribution of counts
+sns.barplot(x='year',y='total_count',data=df[['year','total_count']])
+ax.set_title('Yearly distribution of counts')
+plt.show()
+
+fig,ax=plt.subplots(figsize=(15,8))
+#Barplot for Holiday distribution of counts
+sns.violinplot(data=df,x='holiday',y='total_count',hue='season')
+ax.set_title('Holiday wise distribution of counts')
+plt.show()
+
+fig,ax=plt.subplots(figsize=(15,8))
+#Barplot for Holiday distribution of counts
+sns.barplot(data=df,x='holiday',y='total_count',hue='season')
+ax.set_title('Holiday wise distribution of counts')
+plt.show()
+
+fig,ax=plt.subplots(figsize=(15,8))
+#Bar plot for workingday distribution of counts
+sns.barplot(data=df,x='workingday',y='total_count',hue='season')
+ax.set_title('Workingday wise distribution of counts')
+plt.show()
+
+fig,ax1=plt.subplots(figsize=(15,8))
+#Bar plot for weather_condition distribution of counts
+sns.barplot(x='weather_condition',y='total_count',data=df[['month','total_count','weather_condition']],ax=ax1)
+ax1.set_title('Weather condition wise monthly distribution of counts')
+plt.show()
+
+fig,ax=plt.subplots(figsize=(15,8))
+#Boxplot for total_count outliers
+sns.boxplot(data=df[['total_count']])
+ax.set_title('total_count outliers')
+plt.show()
+
+fig,ax=plt.subplots(figsize=(15,8))
+#Box plot for Temp_windspeed_humidity_outliers
+sns.boxplot(data=df[['temp','windspeed','humidity']])
+ax.set_title('Temp_windspeed_humidity_outiers')
+plt.show()
+
+
+import scipy.stats as stat
+import pylab
+
+def plot_curve(df,feature):
+    plt.figure(figsize=(10,6))
+    plt.subplot(1,2,1)
+    df[feature].hist()
+    plt.subplot(1,2,2)
+    stat.probplot(df[feature],dist='norm',plot=pylab)
+    plt.show()
+plot_curve(df,'total_count')
+
+
+correMtr=df[["temp","atemp","humidity","windspeed","casual","registered","total_count"]].corr()
+mask=np.array(correMtr)
+mask[np.tril_indices_from(mask)]=False
+#Heat map for correlation matrix of attributes
+fig,ax=plt.subplots(figsize=(15,8))
+sns.heatmap(correMtr,mask=mask,vmax=0.8,square=True,annot=True,ax=ax)
+ax.set_title('Correlation matrix of attributes')
+plt.show()
+
+#categorical attributes
+cat_attributes=['season','holiday','workingday','weather_condition','year']
+#numerical attributes
+num_attributes=['temp','windspeed','humidity','month','weekday']
+
+#OneHotCoding
+encoded_df =pd.get_dummies(x,columns=cat_attributes)
+print('Shape of transfomed dataframe::',encoded_df.shape)
+encoded_df.head()
+encoded_df=encoded_df.drop('datetime',axis=1)
+
+encoded_df
+
+from sklearn import preprocessing,metrics,linear_model
+from sklearn.model_selection import cross_val_score,cross_val_predict,train_test_split
+
+x= encoded_df.iloc[:,0:-1] ## Independent Features
+y= encoded_df.iloc[:,-1] ## Dependent Varibales
+
+X_train,X_test,y_train,y_test=train_test_split(x,y,test_size=0.3, random_state=42)
+X_train
+
+#linearRegression
+
+from sklearn.linear_model import LinearRegression
+linreg= LinearRegression()
+linreg.fit(X_train,y_train)
+pred= linreg.predict(X_test)
+
+lr=linreg.score(X_train,y_train)
+print('Accuracy of the model :',lr)
+print('Model coefficients :',linreg.coef_)
+print('Model intercept value :',linreg.intercept_)
+
+import math
+#Root mean square error 
+rmse=math.sqrt(metrics.mean_squared_error(y_test,pred))
+#Mean absolute error
+mae=metrics.mean_absolute_error(y_test,pred)
+print('Root mean square error :',rmse)
+print('Mean absolute error :',mae)
+
+sns.displot(y_test-pred)
+
+#RandomForrestRegressor
+
+from sklearn.ensemble import RandomForestRegressor
+rf=RandomForestRegressor(n_estimators=200)
+rf.fit(X_train,y_train)
+rf_score =rf.score(X_train,y_train)
+print('Accuracy of the model :',rf_score)
+rf_pred=rf.predict(X_test)
+
+#Root mean square error
+rmse = math.sqrt(metrics.mean_squared_error(y_test,rf_pred))
+print('Root mean square error :',rmse)
+#Mean absolute error
+mae=metrics.mean_absolute_error(y_test,rf_pred)
+print('Mean absolute error :',mae)
+
+#AutoML
+
+!pip install requests
+!pip install tabulate
+!pip install "colorama>=0.3.8"
+!pip install future
+
+!pip install h2o
+
+import h2o
+from h2o.automl import H2OAutoML
+h2o.init(max_mem_size='16G')  ##  the h2o.init() makes sure that no prior instance of H2O is running.
+
+df = h2o.import_file("/content/drive/MyDrive/day.csv")
+df.head()
+
+df_train,df_test= df.split_frame(ratios=[.8])
+
+df_train
+
+y = "cnt"  ## dependent variable
+x = df.columns  ## Independent variable
+x.remove(y)
+x.remove('casual')
+x.remove('registered')
+
+aml = H2OAutoML(max_runtime_secs=300,max_models = 10, seed = 10, verbosity="info", nfolds=2)
+
+aml.train(x=x,y=y, training_frame=df_train)
+
+Fitting the model
+
+lb = aml.leaderboard
+
+lb
+
+Getting all the model ids
+
+model_ids = list(aml.leaderboard['model_id'].as_data_frame().iloc[:,0])
+
+model_ids
+
+aml.leader.model_performance(df_test)
+
+Getting the model details for best performing model
+
+h2o.get_model([mid for mid in model_ids if "StackedEnsemble" in mid][0])
+
+output= h2o.get_model([mid for mid in model_ids if "StackedEnsemble" in mid][0])
+
+output.params
+
+aml.leader
+
+y_pred=aml.leader.predict(df_test)
+
+y_pred
