@@ -1,0 +1,669 @@
+import pandas as pd 
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+import warnings
+warnings.filterwarnings('ignore')
+%matplotlib inline
+
+well1= pd.read_csv('./Fianl Data modified/well 1.csv')
+well2= pd.read_csv('./Fianl Data modified/well 2.csv')
+well3= pd.read_csv('./Fianl Data modified/well 3.csv')
+well4= pd.read_csv('./Fianl Data modified/well 4.csv')
+well5= pd.read_csv('./Fianl Data modified/well 5.csv')
+well6= pd.read_csv('./Fianl Data modified/well 6.csv')
+well7= pd.read_csv('./Fianl Data modified/well 7.csv')
+well8= pd.read_csv('./Fianl Data modified/well 8.csv')
+
+df= pd.concat([well1,well2,well3,well4,well5,well6,well7,well8])
+
+df.shape
+
+df
+
+df.isnull().sum()
+
+No null values
+
+Outliers
+
+For training data
+
+df.columns
+
+cols= ['DEPTH', 'GR', 'RHOB', 'Vp', 'Vsh', 'Caliper', 'Porosity',
+       'Resistivity', 'PP','Stress']
+
+for col in cols :
+    plt.figure()
+    sns.boxplot(df[col])
+
+plt.figure(figsize=(13,10))
+plt.subplot(3,2,1)
+sns.boxplot(df['GR'])
+#plt.title('Before Outlier Removal', size=15)
+
+plt.subplot(3,2,2)
+sns.boxplot(df['GR'])
+#plt.title('After Outlier Removal with Standard Deviation Filter', size=15)
+
+plt.subplot(3,2,3)
+sns.boxplot(df['RHOB'])
+#plt.title('After Outlier Removal with Isolation Forest', size=15)
+
+plt.subplot(3,2,4)
+sns.boxplot(df['Vp'])
+#plt.title('After Outlier Removal with Min. Covariance', size=15)
+
+plt.subplot(3,2,5)
+sns.boxplot(df['Vsh'])
+#plt.title('After Outlier Removal with Local Outlier Factor', size=15)
+
+plt.subplot(3,2,6)
+sns.boxplot(df['Caliper'])
+#plt.title('After Outlier Removal with One-class SVM', size=15)
+
+plt.tight_layout(1.7)
+plt.show()
+
+# GR
+
+df['GR'][df['GR']<70]= np.nan
+# RHOB
+df['RHOB'][df['RHOB']<1.5] = np.nan
+# Vp
+df['Vp'][df['Vp']>1.70] = np.nan
+# Vsh
+df['Vsh'][df['Vsh']<0.37] = np.nan
+# Caliper
+df['Caliper'][df['Caliper']>11]= np.nan
+# Porosity
+df['Porosity'][df['Porosity']>75]= np.nan
+# Resistivity
+df['Resistivity'][df['Resistivity']>1.5]= np.nan
+
+df= df.dropna()
+
+for col in cols :
+    plt.figure()
+    sns.boxplot(df[col])
+
+Outlier Removed
+
+Shape of train data after outlier removal
+
+print('Train size: ',df.shape)
+
+sns.displot(df[['GR', 'RHOB', 'Vp', 'Vsh', 'Caliper', 'Porosity',
+       'Resistivity']])
+
+Better to scale these values to (0,1)
+
+from sklearn.preprocessing import MinMaxScaler
+
+scale= MinMaxScaler()
+
+cols= ['GR', 'RHOB', 'Vp', 'Vsh', 'Caliper', 'Porosity',
+       'Resistivity','Stress']
+
+Train data
+
+scaled= scale.fit_transform(df[['GR', 'RHOB', 'Vp', 'Vsh', 'Caliper', 'Porosity',
+       'Resistivity','Stress']])
+
+scaled_df= pd.DataFrame(scaled,columns= cols)
+
+df= df.reset_index()
+
+scaled_df
+
+merge= [df['DEPTH'],df['PP'],scaled_df]
+pd.concat(merge,axis=1)
+
+df_scaled= pd.concat(merge,axis=1)
+
+sns.displot(df_scaled[['GR', 'RHOB', 'Vp', 'Vsh', 'Caliper', 'Porosity',
+       'Resistivity','Stress']])
+
+Our Data is perfect and ready for model development
+
+sns.set_theme(style="white")
+plt.figure(dpi = (100))
+sns.jointplot(x = df['Porosity'], y = df['PP'], kind='reg', line_kws={"color": "red"})
+
+sns.set_theme(style="white")
+plt.figure(dpi = (100))
+sns.jointplot(x = df['RHOB'], y = df['PP'], kind='reg', line_kws={"color": "red"})
+
+df= df_scaled.drop(['Vp'],axis=1)
+df
+
+df.corr()
+
+plt.figure(figsize=(12,8)) 
+sns.heatmap(df.corr(), annot=True, cmap='Dark2_r', linewidths = 2)
+plt.show()
+
+#### Splitting the data
+
+from sklearn.model_selection import train_test_split
+
+x= df.drop(['PP','DEPTH'],axis=1) ##independent var
+y= df['PP'] ## dependent var
+
+x_train, x_test, y_train, y_test = train_test_split(x, y, test_size = 0.2, random_state = 42)
+
+print("Training size:",x_train.shape)
+print("Testing size:",x_test.shape)
+
+### We will be using the following models:
+- Linear Regression(All kinds)
+- Random Forest Regressor
+- XGB Regressor
+- SVM Regressor
+- ANN
+
+#### We will be HyperTuning the top 3 models
+
+## 1)  Regression Models
+
+### 1.1) Multiple Linear Regression
+
+from sklearn.linear_model import LinearRegression
+
+model = LinearRegression(fit_intercept = True, normalize = True)
+model.fit(x_train, y_train)
+pred = model.predict(x_test)
+ 
+train_score = model.score(x_train, y_train)
+print(f'Train score of trained model: {train_score*100}')
+
+test_score = model.score(x_test, y_test)
+print(f'Test score of trained model: {test_score*100}')
+
+print('Linear Model Coefficient (m): ', model.coef_)
+print('Linear Model Coefficient (b): ', model.intercept_)
+
+sns.set_theme(style="white")
+sns.jointplot(x=y_test, y=pred, kind='reg', line_kws={"color": "red"})
+
+## Plot for observing the predicted and actual values
+
+Evaluation for Simple Multiple Linear Regression model
+
+import sklearn.metrics as metrics
+from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
+from math import sqrt
+
+k = x_test.shape[1]
+n = len(x_test)
+
+MSE = mean_squared_error(y_test, pred)
+RMSE = np.sqrt(metrics.mean_squared_error(y_test, pred))
+MAE = mean_absolute_error(y_test, pred)
+MAPE = np.mean(np.abs( (y_test-pred) / y_test))*100
+r2_linreg = r2_score(y_test, pred)
+adj_r2 = 1-(1-r2_linreg) * (n-1)/(n-k-1)
+
+results = [MSE, RMSE, MAE, MAPE, r2_linreg, adj_r2]
+metrics = ['MSE', 'RMSE', 'MAE', 'MAPE', 'r2', 'adj_r2']
+
+table_results = pd.DataFrame({'Metric': metrics, 'Score': results})
+table_results
+
+As we see the Simple Linear Regrsession model has not performed well.
+
+Let us shift to Ridge regression
+
+### 1.2) Ridge Regression
+
+from sklearn.linear_model import Ridge
+
+ridge = Ridge(alpha = 0.001, normalize=True)
+ridge.fit(x_train, y_train)
+
+pred = ridge.predict(x_test)
+
+train_score = ridge.score(x_train, y_train)
+print(f'Train score of trained model: {train_score*100}')
+
+test_score = ridge.score(x_test, y_test)
+print(f'Test score of trained model: {test_score*100}')
+
+k = x_test.shape[1]
+n = len(x_test)
+
+MSE = mean_squared_error(y_test, pred)
+RMSE = np.sqrt(mean_squared_error(y_test, pred))
+MAE = mean_absolute_error(y_test, pred)
+r2_ridge = r2_score(y_test, pred)
+adj_r2 = 1-(1-r2_ridge) * (n-1)/(n-k-1)
+
+results = [MSE, RMSE, MAE, r2_ridge, adj_r2]
+metrics = ['MSE', 'RMSE', 'MAE', 'r2', 'adj_r2']
+
+table_results = pd.DataFrame({'Metric': metrics, 'Score': results})
+table_results
+
+Ridge Also did not perform well
+
+plt.plot(y_test, pred, "o", color = 'r')
+
+
+plt.xlabel("Model Predictions")
+plt.ylabel("True Value (ground Truth)")
+plt.title('Ridge Regression Predictions')
+plt.show()
+
+## 2) Random Forest Regressor
+
+from sklearn.ensemble import RandomForestRegressor
+
+reg=RandomForestRegressor()
+
+reg.fit(x_train, y_train)
+
+pred=reg.predict(x_test)
+
+rf_acc=r2_score(y_test, pred)
+print("R^2",rf_acc)
+print("Adusted R^2", 1-(1-r2_score(y_test, pred))*(len(y_test)-1)/(len(y_test)-x_test.shape[1]-1))
+print("MAE", mean_absolute_error(y_test, pred))
+print("MSE", mean_squared_error(y_test, pred))
+print("RMSE",np.sqrt(mean_squared_error(y_test, pred)))
+
+# visualize the difference between the actual and predicted price 
+plt.scatter(y_test, pred)
+plt.xlabel("Pore Pressure")
+plt.ylabel("Predicted Pore Pressure")
+plt.title("Predicted Vs Actual for Random Forest")
+plt.show()
+
+## 3) XGB Regressor
+
+from xgboost import XGBRegressor
+
+xreg=XGBRegressor()
+
+xreg.fit(x_train, y_train)
+
+pred=xreg.predict(x_test)
+
+xgb_acc=r2_score(y_test, pred)
+print("R^2",rf_acc)
+print("Adusted R^2", 1-(1-r2_score(y_test, pred))*(len(y_test)-1)/(len(y_test)-x_test.shape[1]-1))
+print("MAE", mean_absolute_error(y_test, pred))
+print("MSE", mean_squared_error(y_test, pred))
+print("RMSE",np.sqrt(mean_squared_error(y_test, pred)))
+
+# visualize the difference between the actual and predicted price 
+plt.scatter(y_test, pred)
+plt.xlabel("Pore Pressure")
+plt.ylabel("Predicted Pore Pressure")
+plt.title("Predicted Vs Actual for XGB ")
+plt.show()
+
+## 4) SVM Regressor
+
+from sklearn import svm
+
+regg=svm.SVR()
+
+regg.fit(x_train,y_train)
+
+pred=regg.predict(x_test)
+
+regg_acc=r2_score(y_test, pred)
+print("R^2",regg_acc)
+print("Adusted R^2", 1-(1-r2_score(y_test, pred))*(len(y_test)-1)/(len(y_test)-x_test.shape[1]-1))
+print("MAE", mean_absolute_error(y_test, pred))
+print("MSE", mean_squared_error(y_test, pred))
+print("RMSE",np.sqrt(mean_squared_error(y_test, pred)))
+
+# visualize the difference between the actual and predicted price 
+plt.scatter(y_test, pred)
+plt.xlabel("Pore Pressure")
+plt.ylabel("Predicted Pore Pressure")
+plt.title("Predicted Vs Actual for SVM ")
+plt.show()
+
+## 5) ANN
+
+from tensorflow import keras
+
+import numpy as np
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.wrappers.scikit_learn import KerasRegressor
+
+seed = 7
+np.random.seed(seed)
+
+# Model
+model = Sequential()
+model.add(Dense(200, input_dim=7, kernel_initializer='normal', activation='relu'))
+model.add(Dense(100, kernel_initializer='normal', activation='relu'))
+model.add(Dense(50, kernel_initializer='normal', activation='relu'))
+model.add(Dense(25, kernel_initializer='normal', activation='relu'))
+model.add(Dense(1, kernel_initializer='normal'))
+# Compile model
+model.compile(loss='mean_squared_error')
+
+feature_cols = x_train
+labels = y_train.values
+
+model.fit(np.array(feature_cols), np.array(labels), epochs=100, batch_size=10)
+
+pred= model.predict(x_test)
+
+ann_acc=r2_score(y_test, pred)
+print("R^2",ann_acc)
+print("Adusted R^2", 1-(1-r2_score(y_test, pred))*(len(y_test)-1)/(len(y_test)-x_test.shape[1]-1))
+print("MAE", mean_absolute_error(y_test, pred))
+print("MSE", mean_squared_error(y_test, pred))
+print("RMSE",np.sqrt(mean_squared_error(y_test, pred)))
+
+# visualize the difference between the actual and predicted price 
+plt.scatter(y_test, pred)
+plt.xlabel("Pore Pressure")
+plt.ylabel("Predicted Pore Pressure")
+plt.title("Predicted Vs Actual for ANN")
+plt.show()
+
+models=pd.DataFrame({
+    'Model':['Linear Regression','Ridge Regression', 'Random Forest', 'XGBoost', 'Support Vector Machine', 'ANN'],
+    'R_squared Score':[r2_linreg*100,r2_ridge*100, rf_acc*100, xgb_acc*100, regg_acc*100, ann_acc*100]
+})
+models.sort_values(by='R_squared Score', ascending=False)
+
+
+## Hypertuning top 3 performing models
+
+### 1) Random Forest Regressor
+
+from sklearn.model_selection import RandomizedSearchCV
+
+rf = RandomForestRegressor(random_state = 42)
+
+from pprint import pprint
+# Look at parameters used by our current forest
+print('Parameters currently in use:\n')
+pprint(rf.get_params())
+
+Defining the parameters
+
+# Number of trees in random forest
+n_estimators = [int(x) for x in np.linspace(start = 200, stop = 2000, num = 10)]
+# Number of features to consider at every split
+max_features = ['auto', 'sqrt']
+# Maximum number of levels in tree
+max_depth = [int(x) for x in np.linspace(10, 110, num = 11)]
+max_depth.append(None)
+# Minimum number of samples required to split a node
+min_samples_split = [2, 5, 10]
+# Minimum number of samples required at each leaf node
+min_samples_leaf = [1, 2, 4]
+# Method of selecting samples for training each tree
+bootstrap = [True, False]
+# Create the random grid
+random_grid = {'n_estimators': n_estimators,
+               'max_features': max_features,
+               'max_depth': max_depth,
+               'min_samples_split': min_samples_split,
+               'min_samples_leaf': min_samples_leaf,
+               'bootstrap': bootstrap}
+pprint(random_grid)
+
+rf_random = RandomizedSearchCV(estimator = rf, param_distributions = random_grid, n_iter = 100, cv = 3, verbose=2, random_state=42, n_jobs = -1)
+# Fit the random search model
+#rf_random.fit(x_train,y_train)
+
+#rf_random.best_params_
+
+rf_tuned= RandomForestRegressor(n_estimators= 800,
+ min_samples_split= 2,
+ min_samples_leaf= 1,
+ max_features='auto',
+ max_depth=100,
+ bootstrap= True)
+
+y_train
+
+rf_tuned.fit(x_train,y_train)
+
+pred_tunedrf= rf_tuned.predict(x_test)
+
+rftuned_acc=r2_score(y_test, pred_tunedrf)
+print("R^2",rftuned_acc)
+print("Adusted R^2", 1-(1-r2_score(y_test, pred_tunedrf))*(len(y_test)-1)/(len(y_test)-x_test.shape[1]-1))
+print("MAE", mean_absolute_error(y_test, pred_tunedrf))
+print("MSE", mean_squared_error(y_test, pred_tunedrf))
+print("RMSE",np.sqrt(mean_squared_error(y_test, pred_tunedrf)))
+
+depth= np.linspace(30,300,len(x_test))
+
+x_testplot= x_test.copy()
+
+x_testplot['Depth']= depth
+
+
+x_testplot['Acutal PP']= y_test
+
+x_testplot['Predicted PP']= pred_tunedrf
+
+fig = plt.figure(figsize=(4,8))
+ax1 = fig.add_subplot(111)
+plt.title('Comparison of Actual and Predicted Pore Pressure')
+ax1.plot(x_testplot["Predicted PP"], x_testplot["Depth"],  color = 'blue', label='Predicted')
+ax1.plot(x_testplot["Acutal PP"], x_testplot["Depth"],  color = 'red', alpha = 0.7, label='Original')
+ax1.legend()
+plt.xlabel('Pore Pressure Results')
+plt.ylabel('DEPTH')
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(7,5))
+plt.plot(y_test, pred_tunedrf, '.', label = 'r^2 = %.3f' % (r2_score(y_test, pred_tunedrf)))
+plt.plot([y_test.min(),y_test.max()],[y_test.min(),y_test.max()], 'r', label = '1:1 line')
+plt.title('Pore Pressure: y_true vs. y_ estimate'); plt.xlabel('Estimate'); plt.ylabel('True')
+plt.legend()
+
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
+
+kf = KFold(n_splits=6, random_state=1)
+
+
+predictions = []
+scores=[]
+for train, test in kf.split(x_test):
+    # The predictors we're using the train the algorithm.
+    train_predictors = x_train
+    # The target we're using to train the algorithm.
+    train_target = y_train
+    # Training the algorithm using the predictors and target.
+    rf_tuned.fit(train_predictors, train_target)
+    # We can now make predictions on the test fold
+    test_predictions = rf_tuned.predict(x_test)
+    predictions.append(test_predictions)
+    score = np.mean(cross_val_score(rf, x_train, y_train , cv=10))
+    val_score= cross_val_score(rf, x_train, y_train , cv=10)
+    
+print (score)
+print(val_score)
+
+fr_val_score= val_score
+
+rf_score_df= pd.DataFrame(fr_val_score)
+rf_score_df= rf_score_df.reset_index()
+rf_score_df
+
+plt.plot(rf_score_df)
+plt.title('R2 Score with 10 CV Folds')
+plt.xlabel('Cross Validation')
+plt.ylabel('R2 Score')
+plt.grid()
+
+### 2) XG Boost Regressor
+
+xgbr=XGBRegressor()
+
+params = { 'max_depth': [3, 5, 6, 10, 15, 20],
+           'learning_rate': [0.01, 0.1, 0.2, 0.3],
+           'subsample': np.arange(0.5, 1.0, 0.1),
+           'colsample_bytree': np.arange(0.4, 1.0, 0.1),
+           'colsample_bylevel': np.arange(0.4, 1.0, 0.1),
+           'n_estimators': [100, 500, 1000]}
+
+from pprint import pprint
+# Look at parameters used by our current forest
+print('Parameters currently in use:\n')
+pprint(xgbr.get_params())
+
+clf = RandomizedSearchCV(estimator=xgbr,
+                         param_distributions=params,
+                         scoring='neg_mean_squared_error',
+                         n_iter=25,
+                         verbose=1)
+
+clf.fit(x_train,y_train)
+
+clf.best_params_
+
+xgb_tuned= XGBRegressor(subsample= 0.7,
+ n_estimators=500,
+max_depth=15,
+ learning_rate= 0.1,
+ colsample_bytree= 0.7999999999999999,
+ colsample_bylevel= 0.6)
+
+xgb_tuned.fit(x_train,y_train)
+
+pred_tunedxgb= xgb_tuned.predict(x_test)
+
+xgbtuned_acc=r2_score(y_test, pred_tunedxgb)
+print("R^2",xgbtuned_acc)
+print("Adusted R^2", 1-(1-r2_score(y_test, pred_tunedxgb))*(len(y_test)-1)/(len(y_test)-x_test.shape[1]-1))
+print("MAE", mean_absolute_error(y_test, pred_tunedxgb))
+print("MSE", mean_squared_error(y_test, pred_tunedxgb))
+print("RMSE",np.sqrt(mean_squared_error(y_test, pred_tunedxgb)))
+
+x_testplot['Predicted PP xgb']= pred_tunedxgb
+
+fig = plt.figure(figsize=(4,8))
+ax1 = fig.add_subplot(111)
+plt.title('Comparison of Actual and Predicted Pore Pressure')
+ax1.plot(x_testplot["Predicted PP xgb"], x_testplot["Depth"],  color = 'blue', label='Predicted')
+ax1.plot(x_testplot["Acutal PP"], x_testplot["Depth"],  color = 'red', alpha = 0.7, label='Original')
+ax1.legend()
+plt.xlabel('Pore Pressure Results')
+plt.ylabel('DEPTH')
+plt.tight_layout()
+plt.show()
+
+plt.figure(figsize=(7,5))
+plt.plot(y_test, pred_tunedxgb, '.', label = 'r^2 = %.3f' % (r2_score(y_test, pred_tunedxgb)))
+plt.plot([y_test.min(),y_test.max()],[y_test.min(),y_test.max()], 'r', label = '1:1 line')
+plt.title('Pore Pressure: y_true vs. y_ estimate'); plt.xlabel('Estimate'); plt.ylabel('True')
+plt.legend()
+
+from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import KFold
+
+kf = KFold(n_splits=6, random_state=1)
+
+
+predictions = []
+scores=[]
+for train, test in kf.split(x_test):
+    # The predictors we're using the train the algorithm.
+    train_predictors = x_train
+    # The target we're using to train the algorithm.
+    train_target = y_train
+    # Training the algorithm using the predictors and target.
+    xgb_tuned.fit(train_predictors, train_target)
+    # We can now make predictions on the test fold
+    test_predictions = xgb_tuned.predict(x_test)
+    predictions.append(test_predictions)
+    score = np.mean(cross_val_score(xgb_tuned, x_train, y_train , cv=10))
+    val_score= cross_val_score(xgb_tuned, x_train, y_train , cv=10)
+    
+print (score)
+print(val_score)
+
+xgb_score_df= pd.DataFrame(val_score)
+rf_score_df= rf_score_df.reset_index()
+xgb_score_df
+
+plt.plot(xgb_score_df)
+plt.title('R2 Score with 10 CV Folds')
+plt.xlabel('Cross Validation')
+plt.ylabel('R2 Score')
+plt.grid()
+
+pip install bayesian-optimization
+
+### 3) Using PyCaret
+
+from pycaret.regression import *
+
+df
+
+df=  df.drop(['DEPTH'],axis=1)
+
+model= setup(data= df, target= 'PP',normalize= True,remove_outliers=True,trigonometry_features=True,profile=True)
+
+compare_models()
+
+et= create_model('et')
+
+tuned_et= tune_model(et)
+
+plot_model(tuned_et)
+
+predictions= tuned_et.predict(x_test)
+
+from sklearn.metrics import r2_score,mean_squared_error,mean_absolute_error
+
+et_acc=r2_score(y_test, predictions)
+print("R^2",et_acc)
+print("Adusted R^2", 1-(1-r2_score(y_test, predictions))*(len(y_test)-1)/(len(y_test)-x_test.shape[1]-1))
+print("MAE", mean_absolute_error(y_test, predictions))
+print("MSE", mean_squared_error(y_test, predictions))
+print("RMSE",np.sqrt(mean_squared_error(y_test, predictions)))
+
+x_testplot['Predicted PP et']= predictions
+
+fig = plt.figure(figsize=(4,8))
+ax1 = fig.add_subplot(111)
+plt.title('Comparison of Actual and Predicted Pore Pressure')
+ax1.plot(x_testplot["Predicted PP et"], x_testplot["Depth"],  color = 'blue', label='Predicted')
+ax1.plot(x_testplot["Acutal PP"], x_testplot["Depth"],  color = 'red', alpha = 0.7, label='Original')
+ax1.legend()
+plt.xlabel('Pore Pressure Results')
+plt.ylabel('DEPTH')
+plt.tight_layout()
+plt.show()
+
+Plotting results
+
+
+fig = plt.figure(figsize=(4,10))
+ax1 = fig.add_subplot(111)
+ax2 = fig.add_subplot(121)
+plt.title('Comparison of Random Forest and XG Boost Predicted Pore Pressure')
+ax1.plot(x_testplot["Predicted PP"], x_testplot["Depth"],  color = 'green', label='Random Forest')
+ax2.plot(x_testplot["Predicted PP xgb"], x_testplot["Depth"],  color = 'red', alpha = 0.7, label='Xg Boost')
+ax1.legend()
+ax2.legend()
+plt.xlabel('Pore Pressure Results')
+plt.ylabel('DEPTH')
+plt.tight_layout()
+plt.show()
+
+## Results
+
+### 96 % accuracy was obtained by Random Forest Model in predicting Pore Pressure, followed by 94% accuracy in XGB Regressor.
+### SVM did not perform well in this data as it gave an accuracy of only around 60-70 %
+### Effective stress was also calculated from mathematical notions and predicted using ML algorithms with an accuracy of about 97 %
+
